@@ -1,17 +1,18 @@
 """
-# Step 1: Produce BAM files from fastq's aligned against reference (Pseudomonas_aeruginosa_PAO1) with BBMap
 
-# Step 2: Tag all sorted bam files with bamaddrg, pass them into a single large bam
+Step 1: Produce BAM files from fastq's aligned against reference (Pseudomonas_aeruginosa_PAO1) with BBMap
 
-# Step 3: Sort BAM file with samtools
+Step 2: Tag all sorted bam files with bamaddrg, pass them into a single large bam
 
-# Step 4: Remove duplicate reads with SAMtools
+Step 3: Sort BAM file with samtools
 
-# Step 5: Index data with SAMtools
+Step 4: Remove duplicate reads with SAMtools
 
-# Step 6: Run tagged bam file through freebayes to produce a VCF
+Step 5: Index data with SAMtools
 
-# Step 7: Filter VCF to a minimum read depth of 3
+Step 6: Run tagged bam file through freebayes to produce a VCF
+
+Step 7: Filter VCF to a minimum read depth of 3
 
 NOTES: After building this the first iteration of this pipeline I found a publication released in 2017 that recommends
 using BBMap + FreeBayes for variant calling. This is good news.
@@ -19,13 +20,14 @@ using BBMap + FreeBayes for variant calling. This is good news.
 Here's the link: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0174446
 Supplementary File S5 in the publication offers reference commands for running the programs.
 
-# Requirements:
+Requirements:
     - Python 3
     - FreeBayes
     - vcflib
     - bbmap
     - bamaddrg
     - samtools
+
 """
 
 import subprocess
@@ -61,13 +63,12 @@ def run_bbmap(read1, read2, base_id, ref_genome):
 
 # STEP 2:
 def run_bamaddrg(*args):
+    print('\nRunning bamaddrg...')
     root_cmd = './bamaddrg '
     for arg in args:
         arg_base = os.path.basename(arg)
         root_cmd += ('-b {} -s {} '.format(arg, arg_base))
     root_cmd += ' > /mnt/nas/bio_requests/9707/pipeline/combined_tagged.bam'
-
-    print('\n' + root_cmd)
 
     p = subprocess.Popen(root_cmd,
                          shell=True,
@@ -76,7 +77,6 @@ def run_bamaddrg(*args):
     p.wait()
 
     combined_bam = glob.glob('/mnt/nas/bio_requests/9707/pipeline/*_tagged.bam')
-    print('\nRETURNING ' + str(combined_bam[0]))
     return combined_bam[0]
 
 
@@ -85,7 +85,7 @@ def sort_bamfile(combined_bam):
     print("\nSorting bam file: {}".format(combined_bam))
     # samtools sort -O bam -o SEQUENCE_DATA_SORTED.BAM -T TEMP -@ 4 SEQUENCE_DATA.BAM
     cmd = 'samtools sort -T TEMP -@ 8 -o {0} {1}'.format(combined_bam.replace('.bam', '_sorted.bam'),
-                                                        combined_bam)
+                                                         combined_bam)
 
     print('\n' + cmd)
     p = subprocess.Popen(cmd,
@@ -94,7 +94,6 @@ def sort_bamfile(combined_bam):
     p.wait()
 
     sorted_bam = glob.glob('/mnt/nas/bio_requests/9707/pipeline/*_sorted.bam')
-    print('\nRETURNING ' + str(sorted_bam))
     return sorted_bam[0]
 
 
@@ -112,17 +111,14 @@ def dedupe_bam(sorted_bam):
     p.wait()
 
     deduped_bam = glob.glob('/mnt/nas/bio_requests/9707/pipeline/*_deduped.bam')
-    print('\nRETURNING ' + str(deduped_bam[0]))
     return deduped_bam[0]
 
 
 # STEP 5:
 def index_bam(deduped_bam):
     print("\nIndexing bam file: {}".format(deduped_bam))
-    # samtools index SEQUENCE_DATA_DEDUP.BAM
-    cmd = 'samtools index {0}'.format(deduped_bam)
-    print(cmd)
 
+    cmd = 'samtools index {0}'.format(deduped_bam)
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
@@ -137,18 +133,16 @@ def run_freebayes(*args):
     for arg in args:
         bams += arg
 
-    bams += ' > /mnt/nas/bio_requests/9707/pipeline/filtered_var.vcf'
+    bams += ' > /mnt/nas/bio_requests/9707/pipeline/var.vcf'
 
-    cmd = 'freebayes -d -f {0} {1}'.format(
+    cmd = 'freebayes -f {0} {1}'.format(
         '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna', bams)
-    print('\n' + cmd)
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
     p.wait()
 
     filtered_vcf = glob.glob('/mnt/nas/bio_requests/9707/pipeline/*.vcf')
-    print('\nRETURNING ' + str(filtered_vcf[0]))
     return filtered_vcf[0]
 
 
@@ -156,51 +150,54 @@ def run_freebayes(*args):
 def run_vcffilter(vcf_file):
     print("\nRunning vcffilter on {}".format(vcf_file))
 
-    cmd = 'vcffilter -f "DP > 2" {0} > {1}'.format(vcf_file, vcf_file.replace('.vcf', '_filtered.vcf'))
-    print('\n' + cmd)
+    cmd = 'vcffilter -f "DP > 2" {0} > {1}'.format(vcf_file, vcf_file.replace('var', 'var_filtered'))
 
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
     p.wait()
 
+
 ########################
 # RUNNING THE PIPELINE #
 ########################
+def main():
+    # 1. Producing sorted BAM files for 0766, 0767, 0768
+    ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
 
-# 1. Producing sorted BAM files for 0766, 0767, 0768
-ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
+    bam1 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R1_trimmed.fastq.bz2',
+                     read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R2_trimmed.fastq.bz2',
+                     base_id='2017-SEQ-0766',
+                     ref_genome=ref_genome_fasta)
 
-bam1 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R1_trimmed.fastq.bz2',
-                 read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R2_trimmed.fastq.bz2',
-                 base_id='2017-SEQ-0766',
-                 ref_genome=ref_genome_fasta)
+    bam2 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R1_trimmed.fastq.bz2',
+                     read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R2_trimmed.fastq.bz2',
+                     base_id='2017-SEQ-0767',
+                     ref_genome=ref_genome_fasta)
 
-bam2 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R1_trimmed.fastq.bz2',
-                 read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R2_trimmed.fastq.bz2',
-                 base_id='2017-SEQ-0767',
-                 ref_genome=ref_genome_fasta)
+    bam3 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R1_trimmed.fastq.bz2',
+                     read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R2_trimmed.fastq.bz2',
+                     base_id='2017-SEQ-0768',
+                     ref_genome=ref_genome_fasta)
 
-bam3 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R1_trimmed.fastq.bz2',
-                 read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R2_trimmed.fastq.bz2',
-                 base_id='2017-SEQ-0768',
-                 ref_genome=ref_genome_fasta)
+    # 2. Tagging/merging all BAM files with bamaddrg
+    combined_bam = run_bamaddrg(bam1, bam2, bam3)
 
-# 2. Tagging/merging all BAM files with bamaddrg
-combined_bam = run_bamaddrg(bam1, bam2, bam3)
+    # 3. Sort BAM
+    sorted_bamfile = sort_bamfile(combined_bam)
 
-# 3. Sort BAM
-sorted_bamfile = sort_bamfile(combined_bam)
+    # 4. Dedupe BAM
+    deduped_bam = dedupe_bam(sorted_bamfile)
 
-# 4. Dedupe BAM
-deduped_bam = dedupe_bam(sorted_bamfile)
+    # 5. Index BAM
+    index_bam(deduped_bam)
 
-# 5. Index BAM
-index_bam(deduped_bam)
+    # 6. Run combined/tagged bam files through freebayes to determine SNVs/indels
+    filtered_vcf = run_freebayes(deduped_bam)
 
-# 6. Run combined/tagged bam files through freebayes to determine SNVs/indels
-filtered_vcf = run_freebayes(deduped_bam)
+    # 7. Run vcffilter with minimum read depth of 3
+    run_vcffilter(filtered_vcf)
 
-# 7. Run vcffilter with minimum read depth of 3
-run_vcffilter(filtered_vcf)
 
+if __name__ == '__main__':
+    main()
