@@ -87,7 +87,6 @@ def sort_bamfile(combined_bam):
     cmd = 'samtools sort -T TEMP -@ 8 -o {0} {1}'.format(combined_bam.replace('.bam', '_sorted.bam'),
                                                          combined_bam)
 
-    print('\n' + cmd)
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
@@ -102,8 +101,6 @@ def dedupe_bam(sorted_bam):
     print("\nDeduping bam file: {}".format(sorted_bam))
     # samtools rmdup -s SEQUENCE_DATA_SORTED.BAM SEQUENCE_DATA_DEDUP.BAM
     cmd = 'samtools rmdup -s {0} {1}'.format(sorted_bam, sorted_bam.replace('_sorted.bam', '_deduped.bam'))
-
-    print('\n' + cmd)
 
     p = subprocess.Popen(cmd,
                          shell=True,
@@ -128,14 +125,15 @@ def index_bam(deduped_bam):
 # STEP 6:
 def run_freebayes(*args):
     # TODO: use freebayes-parallel instead. Must be run from the freebayes installation directory.
-    print("\nRunning freebayes")
+    print("\nRunning freebayes...")
     bams = ''
     for arg in args:
         bams += arg
 
     bams += ' > /mnt/nas/bio_requests/9707/pipeline/var.vcf'
 
-    cmd = 'freebayes -f {0} {1}'.format(
+    # Set ploidy to 1 with -p 1. If this isn't specified the program will assume diploid.
+    cmd = 'freebayes -p 1 -f {0} {1}'.format(
         '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna', bams)
     p = subprocess.Popen(cmd,
                          shell=True,
@@ -148,9 +146,12 @@ def run_freebayes(*args):
 
 # STEP 7:
 def run_vcffilter(vcf_file):
+    """
+    See some vcffilter examples at https://www.biostars.org/p/51439/
+    """
     print("\nRunning vcffilter on {}".format(vcf_file))
 
-    cmd = 'vcffilter -f "DP > 2" {0} > {1}'.format(vcf_file, vcf_file.replace('var', 'var_filtered'))
+    cmd = 'vcffilter -f "DP > 2 & QUAL > 20" {0} > {1}'.format(vcf_file, vcf_file.replace('var', 'var_filtered'))
 
     p = subprocess.Popen(cmd,
                          shell=True,
