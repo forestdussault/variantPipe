@@ -15,9 +15,11 @@ Step 6: Run tagged bam file through freebayes to produce a VCF
 Step 7: Filter VCF to a minimum read depth of 3
 
 NOTES: After building this the first iteration of this pipeline I found a publication released in 2017 that recommends
-using BBMap + FreeBayes for variant calling. This is good news.
+using BBMap + FreeBayes for variant calling.
 
-Here's the link: http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0174446
+Here's the link:
+http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0174446
+
 Supplementary File S5 in the publication offers reference commands for running the programs.
 
 Requirements:
@@ -123,7 +125,7 @@ def index_bam(deduped_bam):
 
 
 # STEP 6:
-def run_freebayes(*args):
+def run_freebayes(*args, ref_genome):
     # TODO: use freebayes-parallel instead. Must be run from the freebayes installation directory.
     print("\nRunning freebayes...")
     bams = ''
@@ -134,7 +136,7 @@ def run_freebayes(*args):
 
     # Set ploidy to 1 with -p 1. If this isn't specified the program will assume diploid.
     cmd = 'freebayes -p 1 -f {0} {1}'.format(
-        '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna', bams)
+        ref_genome, bams)
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
@@ -164,7 +166,9 @@ def run_vcffilter(vcf_file):
 ########################
 def main():
     # 1. Producing sorted BAM files for 0766, 0767, 0768
-    ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
+
+    # ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
+    ref_genome_fasta = '/mnt/nas/bio_requests/9707/BestAssemblies/2017-SEQ-0768.fasta'
 
     bam1 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R1_trimmed.fastq.bz2',
                      read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R2_trimmed.fastq.bz2',
@@ -194,7 +198,7 @@ def main():
     index_bam(deduped_bam)
 
     # 6. Run combined/tagged bam files through freebayes to determine SNVs/indels
-    filtered_vcf = run_freebayes(deduped_bam)
+    filtered_vcf = run_freebayes(deduped_bam, ref_genome=ref_genome_fasta)
 
     # 7. Run vcffilter with minimum read depth of 3
     run_vcffilter(filtered_vcf)
