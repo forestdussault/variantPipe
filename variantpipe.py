@@ -137,10 +137,10 @@ def run_freebayes(*args):
     for arg in args:
         bams += arg
 
-    bams += ' | vcffilter -f "QUAL > 20" > /mnt/nas/bio_requests/9707/pipeline/filtered_var.vcf'
+    bams += ' > /mnt/nas/bio_requests/9707/pipeline/filtered_var.vcf'
 
     cmd = 'freebayes -d -f {0} {1}'.format(
-        '/mnt/nas/bio_requests/9707/ref/Pseudomonas_aeruginosa_PAO1_107.fna', bams)
+        '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna', bams)
     print('\n' + cmd)
     p = subprocess.Popen(cmd,
                          shell=True,
@@ -156,7 +156,7 @@ def run_freebayes(*args):
 def run_vcffilter(vcf_file):
     print("\nRunning vcffilter on {}".format(vcf_file))
 
-    cmd = 'vcffilter -f "DP > 2" {0} > {1}'.format(vcf_file, vcf_file.replace('.vcf','_filtered.vcf'))
+    cmd = 'vcffilter -f "DP > 2" {0} > {1}'.format(vcf_file, vcf_file.replace('.vcf', '_filtered.vcf'))
     print('\n' + cmd)
 
     p = subprocess.Popen(cmd,
