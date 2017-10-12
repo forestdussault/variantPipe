@@ -1,6 +1,6 @@
 """
 
-Step 1: Produce BAM files from fastq's aligned against reference (Pseudomonas_aeruginosa_PAO1) with BBMap
+Step 1: Produce BAM files from fastq's aligned against reference with BBMap
 
 Step 2: Tag all sorted bam files with bamaddrg, pass them into a single large bam
 
@@ -12,7 +12,7 @@ Step 5: Index data with SAMtools
 
 Step 6: Run tagged bam file through freebayes to produce a VCF
 
-Step 7: Filter VCF to a minimum read depth of 3
+Step 7: Filter VCF to a minimum read depth of 3, QUAL > 20
 
 NOTES: After building this the first iteration of this pipeline I found a publication released in 2017 that recommends
 using BBMap + FreeBayes for variant calling.
@@ -65,7 +65,10 @@ def run_bbmap(read1, read2, base_id, ref_genome):
 
 # STEP 2:
 def run_bamaddrg(*args):
-    print('\nRunning bamaddrg...')
+    print('\nRunning bamaddrg on the following:')
+    for arg in args:
+        print(os.path.basename(arg))
+
     root_cmd = './bamaddrg '
     for arg in args:
         arg_base = os.path.basename(arg)
@@ -126,8 +129,15 @@ def index_bam(deduped_bam):
 
 # STEP 6:
 def run_freebayes(*args, ref_genome):
+    """
+    Can take several BAM files, though currently I'm combining all BAM files with bamaddrg prior to this step.
+    Requires the reference genome to be specified.
+    """
     # TODO: use freebayes-parallel instead. Must be run from the freebayes installation directory.
-    print("\nRunning freebayes...")
+    print("\nRunning freebayes on the following:")
+    for arg in args:
+        print(os.path.basename(arg))
+
     bams = ''
     for arg in args:
         bams += arg
@@ -135,8 +145,7 @@ def run_freebayes(*args, ref_genome):
     bams += ' > /mnt/nas/bio_requests/9707/pipeline/var.vcf'
 
     # Set ploidy to 1 with -p 1. If this isn't specified the program will assume diploid.
-    cmd = 'freebayes -p 1 -f {0} {1}'.format(
-        ref_genome, bams)
+    cmd = 'freebayes -p 1 -f {0} {1}'.format(ref_genome, bams)
     p = subprocess.Popen(cmd,
                          shell=True,
                          executable='/bin/bash')
@@ -153,6 +162,7 @@ def run_vcffilter(vcf_file):
     """
     print("\nRunning vcffilter on {}".format(vcf_file))
 
+    # vcffilter set to minimum read depth of 3 and quality > 20
     cmd = 'vcffilter -f "DP > 2 & QUAL > 20" {0} > {1}'.format(vcf_file, vcf_file.replace('var', 'var_filtered'))
 
     p = subprocess.Popen(cmd,
@@ -167,26 +177,26 @@ def run_vcffilter(vcf_file):
 def main():
     # 1. Producing sorted BAM files for 0766, 0767, 0768
 
-    # ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
-    ref_genome_fasta = '/mnt/nas/bio_requests/9707/BestAssemblies/2017-SEQ-0768.fasta'
+    ref_genome_fasta = '/mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna'
+    # ref_genome_fasta = '/mnt/nas/bio_requests/9707/BestAssemblies/2017-SEQ-0768.fasta'
 
     bam1 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R1_trimmed.fastq.bz2',
                      read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766/2017-SEQ-0766_R2_trimmed.fastq.bz2',
                      base_id='2017-SEQ-0766',
                      ref_genome=ref_genome_fasta)
+    #
+    # bam2 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R1_trimmed.fastq.bz2',
+    #                  read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R2_trimmed.fastq.bz2',
+    #                  base_id='2017-SEQ-0767',
+    #                  ref_genome=ref_genome_fasta)
 
-    bam2 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R1_trimmed.fastq.bz2',
-                     read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767/2017-SEQ-0767_R2_trimmed.fastq.bz2',
-                     base_id='2017-SEQ-0767',
-                     ref_genome=ref_genome_fasta)
-
-    bam3 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R1_trimmed.fastq.bz2',
-                     read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R2_trimmed.fastq.bz2',
-                     base_id='2017-SEQ-0768',
-                     ref_genome=ref_genome_fasta)
+    # bam3 = run_bbmap(read1='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R1_trimmed.fastq.bz2',
+    #                  read2='/mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768/2017-SEQ-0768_R2_trimmed.fastq.bz2',
+    #                  base_id='2017-SEQ-0768',
+    #                  ref_genome=ref_genome_fasta)
 
     # 2. Tagging/merging all BAM files with bamaddrg
-    combined_bam = run_bamaddrg(bam1, bam2, bam3)
+    combined_bam = run_bamaddrg(bam1)
 
     # 3. Sort BAM
     sorted_bamfile = sort_bamfile(combined_bam)
@@ -200,9 +210,10 @@ def main():
     # 6. Run combined/tagged bam files through freebayes to determine SNVs/indels
     filtered_vcf = run_freebayes(deduped_bam, ref_genome=ref_genome_fasta)
 
-    # 7. Run vcffilter with minimum read depth of 3
+    # 7. Run vcffilter with minimum read depth of 3, Q > 20
     run_vcffilter(filtered_vcf)
 
+    print('Job done.')
 
 if __name__ == '__main__':
     main()
