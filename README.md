@@ -28,11 +28,10 @@ This is a command line tool that requires at least three inputs.
 2. Path to the reference genome `-r, --refgenome`
 3. Path to your desired output directory `-o, --outputdir`
 
+BBMap can optionally be swapped out for bowtie2 as the aligner with the flag `-bt, --bowtie2`
+
 *Example command:*
 
-`python3 variantpipe.py /mnt/nas/bio_requests/9707/fastq/2017-SEQ-0766 /mnt/nas/bio_requests/9707/fastq/2017-SEQ-0767 /mnt/nas/bio_requests/9707/fastq/2017-SEQ-0768
--r /mnt/nas/bio_requests/9707/ref/Pseudomonas_simple_name.fna
--o /mnt/nas/bio_requests/9707/CLI_testing`
+`python3 variantpipe.py /path/to/SAMPLE1 /path/to/SAMPLE2 /path/to/SAMPLE3 -r /path/to/ref.fasta -o /path/to/output`
 
-BBMap can be swapped out for bowtie2 as the aligner with the flag `-bt, --bowtie2`
 
