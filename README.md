@@ -30,7 +30,7 @@ This is a command line tool that requires at least three inputs.
 
 ### Other options:
 - `-bt, --bowtie2`: set the aligner to bowtie2 instead of bbmap
-- `qm, --qualimap`: process each output bam file with qualimap
+- `-qm, --qualimap`: process each output bam file with qualimap
 
 *Example command:*
 
